@@ -1,22 +1,17 @@
-# modal_inference.py
-from __future__ import annotations
-
 from pathlib import Path
 
 import modal
 
 app = modal.App("seq2seq-jax-inference")
 
-# Pick an image that includes your runtime deps.
 image = modal.Image.debian_slim().pip_install(
-    "jax[cpu]",  # or install your CUDA-compatible stack if using GPU
+    "jax[gpu]",
     "flax",
     "numpy",
     "orbax-checkpoint",
     "sentencepiece",  # if you use it
 )
 
-# Store weights/checkpoints in a Modal Volume.
 model_volume = modal.Volume.from_name("seq2seq-model-weights", create_if_missing=True)
 MODEL_DIR = "/models"
 
@@ -26,18 +21,14 @@ MODEL_DIR = "/models"
     volumes={MODEL_DIR: model_volume},
     cpu=4.0,
     memory=8192,
-    # add gpu=... if your model really benefits from GPU
-    # scaledown_window=300,  # optional: keep warm a bit longer
 )
 class Seq2SeqModel:
     @modal.enter()
     def load(self):
-        # Load tokenizer / params / compiled model one time per container
         self.model_path = Path(MODEL_DIR) / "my_checkpoint"
-        # self.tokenizer = ...
+        self.tokenizer = ...
         # self.params = ...
         # self.model = ...
-        # any jax jit warmup here if useful
 
     @modal.method()
     def predict(self, text: str, max_new_tokens: int = 128) -> dict:
