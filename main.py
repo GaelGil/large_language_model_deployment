@@ -44,19 +44,24 @@ class Translator:
     def load(self):
         """Load tokenizer and model on container startup."""
         # -------------------------------------------------------------------------
-        # 1. Load SentencePiece tokenizer
+        #  Load SentencePiece tokenizer
         # -------------------------------------------------------------------------
         self.sp = SentencePieceProcessor()
-        self.sp.Load("/model/joint.model")
+        self.sp.Load(CONFIG.TOKENIZER_PATH)
         self.eos_id = self.sp.eos_id()
         self.bos_id = self.sp.bos_id()
         self.utils = Utils()
 
-        # initialize the checkpoint manager with the options
+        # -------------------------------------------------------------------------
+        # initialize the checkpoint manager
+        # -------------------------------------------------------------------------
         manager = ocp.CheckpointManager(
             directory=CONFIG.MODEL_CHECKPOINT_PATH.resolve(),
         )
-        # Placeholder - replace with actual model loading
+
+        # -------------------------------------------------------------------------
+        # Restore the model
+        # -------------------------------------------------------------------------
         self.model = self.utils.init_state(
             src_vocab_size=10,
             target_vocab_size=10,
@@ -93,7 +98,15 @@ class Translator:
         # -------------------------------------------------------------------------
         # 1. Encode source text
         # -------------------------------------------------------------------------
-        es_ids = self.utils.encode(src_text, add_bos=False, add_eos=False)
+        es_ids = self.utils.encode(
+            src_text,
+            add_bos=False,
+            add_eos=False,
+            eos_id=10,
+            bos_id=10,
+            tokenizer=self.sp,
+            max_len=CONFIG.MAX_LEN,
+        )
         es = jnp.array([es_ids], dtype=jnp.int32)  # [1, src_len]
 
         # -------------------------------------------------------------------------
@@ -107,7 +120,7 @@ class Translator:
         # -------------------------------------------------------------------------
         for _ in range(max_new_tokens):
             # Create causal mask for current sequence length
-            decoder_mask = self._create_causal_mask(en.shape[1])
+            decoder_mask = self.utils._create_causal_mask(en.shape[1])
 
             # Forward pass
             logits = self._infer_fn(

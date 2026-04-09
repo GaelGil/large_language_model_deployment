@@ -8,7 +8,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8")
 
     TOKENIZER_PATH: str = Field(default="tokenizer/model/joint.model")
-    MODEL_CHECKPOINT_PATH: Path
+    MODEL_CHECKPOINT_PATH: Path | None = None
     SEQ_LEN: int = Field(default=256)
     MAX_LEN: int = Field(default=128)
     EOS_ID: int = Field(default=2)
