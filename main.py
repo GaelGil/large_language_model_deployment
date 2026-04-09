@@ -48,8 +48,6 @@ class Translator:
         # -------------------------------------------------------------------------
         self.sp = SentencePieceProcessor()
         self.sp.Load(CONFIG.TOKENIZER_PATH)
-        self.eos_id = self.sp.eos_id()
-        self.bos_id = self.sp.bos_id()
         self.utils = Utils()
 
         # -------------------------------------------------------------------------
@@ -63,13 +61,13 @@ class Translator:
         # Restore the model
         # -------------------------------------------------------------------------
         self.model = self.utils.init_state(
-            src_vocab_size=10,
-            target_vocab_size=10,
-            D_MODEL=10,
-            N=10,
-            H=10,
-            D_FF=10,
-            SEQ_LEN=10,
+            src_vocab_size=CONFIG.VOCAB_SIZE,
+            target_vocab_size=CONFIG.VOCAB_SIZE,
+            D_MODEL=CONFIG.D_MODEL,
+            N=CONFIG.N,
+            H=CONFIG.H,
+            D_FF=CONFIG.D_FF,
+            SEQ_LEN=CONFIG.SEQ_LEN,
             manager=manager,
         )
 
@@ -95,6 +93,7 @@ class Translator:
                 "checkpoint loading in the load() method."
             )
 
+        assert self.sp.eos_id
         # -------------------------------------------------------------------------
         # 1. Encode source text
         # -------------------------------------------------------------------------
@@ -102,8 +101,8 @@ class Translator:
             src_text,
             add_bos=False,
             add_eos=False,
-            eos_id=10,
-            bos_id=10,
+            eos_id=self.sp.eos_id(),
+            bos_id=self.sp.bos_id(),
             tokenizer=self.sp,
             max_len=CONFIG.MAX_LEN,
         )
@@ -112,7 +111,7 @@ class Translator:
         # -------------------------------------------------------------------------
         # 2. Initialize decoder with BOS
         # -------------------------------------------------------------------------
-        en_ids = [self.bos_id]
+        en_ids = [self.sp.bos_id()]
         en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
 
         # -------------------------------------------------------------------------
@@ -136,7 +135,7 @@ class Translator:
             next_token = int(jnp.argmax(logits[0, -1]))
 
             # Check for EOS
-            if next_token == self.eos_id:
+            if next_token == self.sp.eos_id():
                 break
 
             # Yield token ID for streaming

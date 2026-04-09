@@ -13,6 +13,10 @@ class Config(BaseSettings):
     MAX_LEN: int = Field(default=128)
     EOS_ID: int = Field(default=2)
     BOS_ID: int = Field(default=1)
+    D_MODEL: int = Field(default=512)
+    N: int = Field(defailt=6)
+    H: int = Field(default=8)
+    D_FF: int = Field(2048)
 
     VOCAB_SIZE: int = Field(default=8000)
     NUM_LAYERS: int = Field(default=6)
