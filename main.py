@@ -1,66 +1,158 @@
+"""
+Modal deployment for JAX NNX translation model.
+
+Usage:
+    modal deploy main.py
+
+Local testing:
+    modal run main --local
+"""
+
+from typing import Generator
+
+import jax.numpy as jnp
 import modal
-import sentencepiece as spm
+import orbax.checkpoint as ocp
+from sentencepiece import SentencePieceProcessor
 
-from config import CONFIG
+from utils.config import CONFIG
+from utils.Utils import Utils
 
-app = modal.App("seq2seq-jax-inference")
+app = modal.App("seq2seq-translator")
 
 image = modal.Image.debian_slim().uv_pip_install(
-    "jax[gpu]",
+    "jax[cuda12]",
     "flax",
     "numpy",
-    "orbax-checkpoint",
     "sentencepiece",
 )
 
-model_volume = modal.Volume.from_name("seq2seq-model-weights", create_if_missing=True)
+model_volume = modal.Volume.from_name(
+    CONFIG.MODAL_VOLUME_NAME,
+    create_if_missing=True,
+)
+
+
+utils = Utils()
 
 
 @app.cls(
     image=image,
-    volumes={CONFIG.MODEL_PATH: model_volume},
-    cpu=4.0,
-    memory=8192,
+    volumes={"/model": model_volume},
+    gpu=CONFIG.MODAL_GPU,
+    memory=CONFIG.MODAL_MEMORY,
 )
-class Seq2SeqModel:
+class Translator:
     @modal.enter()
     def load(self):
-        self.model = .load(CONFIG.MODEL_PATH)
-        sp = spm.SentencePieceProcessor()
-        self.tokenizer = sp.Load(CONFIG.MODEL_PATH)
+        """Load tokenizer and model on container startup."""
+        # -------------------------------------------------------------------------
+        # 1. Load SentencePiece tokenizer
+        # -------------------------------------------------------------------------
+        self.sp = SentencePieceProcessor()
+        self.sp.Load("/model/joint.model")
+        self.eos_id = self.sp.eos_id()
+        self.bos_id = self.sp.bos_id()
 
-    def encode(self, text: str, add_bos: bool, add_eos: bool):
-        ids = self.tokenizer.Encode(text, out_type=int)
+        # initialize the checkpoint manager with the options
 
-        if CONFIG.MAX_LEN is not None:
-            reserved = (1 if add_bos else 0) + (1 if add_eos else 0)
-            content_max = CONFIG.MAX_LEN - reserved
-            if content_max < 0:
-                raise ValueError("max_len too small for requested special tokens")
-            ids = ids[:content_max]
-
-        if add_bos:
-            ids = [self.tokenizer.bos_id()] + ids
-        if add_eos:
-            ids = ids + [self.tokenizer.eos_id()]
-
-        return ids
-
-    @modal.method()
-    def run_inference(self, src, self_mask):
-        logits = self.model(
-            src=src,
-            target=self.encode(text="", add_bos=True, add_eos=False),
-            src_mask=None,
-            self_mask=self_mask,
-            cross_mask=None,
-            is_training=False,
+        manager = ocp.CheckpointManager(
+            directory=CONFIG.MODEL_CHECKPOINT_PATH.resolve(),
         )
 
+        utils
+
+        # Placeholder - replace with actual model loading
+        self.model = None  # Replace with loaded model
+        self._infer_fn = None  # Replace with JIT-compiled inference function
+
     @modal.method()
-    def predict(self, text: str, max_new_tokens: int = 128) -> dict:
-        tokens = self.encode(text, add_bos=True, add_eos=True)
-        output = run_inference(self.model, self.params, tokens, max_new_tokens)
-        decoded = self.tokenizer.decode(output)
-        decoded = f"stub-output-for: {text}"
-        return {"input": text, "output": decoded}
+    def translate_streaming(
+        self,
+        src_text: str,
+        max_new_tokens: int = 128,
+    ) -> Generator[str, None, None]:
+        """
+        Translate text with token-by-token streaming.
+
+        Args:
+            src_text: Source text to translate
+            max_new_tokens: Maximum tokens to generate
+
+        Yields:
+            Token IDs as strings, one at a time
+        """
+        if self.model is None:
+            raise RuntimeError(
+                "Model not loaded. Please set MODEL_CHECKPOINT_PATH and implement "
+                "checkpoint loading in the load() method."
+            )
+
+        # -------------------------------------------------------------------------
+        # 1. Encode source text
+        # -------------------------------------------------------------------------
+        es_ids = self.encode(src_text, add_bos=False, add_eos=False)
+        es = jnp.array([es_ids], dtype=jnp.int32)  # [1, src_len]
+
+        # -------------------------------------------------------------------------
+        # 2. Initialize decoder with BOS
+        # -------------------------------------------------------------------------
+        en_ids = [self.bos_id]
+        en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
+
+        # -------------------------------------------------------------------------
+        # 3. Autoregressive generation loop
+        # -------------------------------------------------------------------------
+        for _ in range(max_new_tokens):
+            # Create causal mask for current sequence length
+            decoder_mask = self._create_causal_mask(en.shape[1])
+
+            # Forward pass
+            logits = self._infer_fn(
+                src=es,
+                target=en,
+                src_mask=None,
+                self_mask=decoder_mask,
+                cross_mask=None,
+                is_training=False,
+            )
+
+            # Greedy sampling: take argmax of last token logits
+            next_token = int(jnp.argmax(logits[0, -1]))
+
+            # Check for EOS
+            if next_token == self.eos_id:
+                break
+
+            # Yield token ID for streaming
+            yield str(next_token)
+
+            # Append to decoder input for next iteration
+            en_ids.append(next_token)
+            en = jnp.array([en_ids], dtype=jnp.int32)
+
+
+# =============================================================================
+# Local development / testing
+# =============================================================================
+
+
+@app.local_entrypoint()
+def main():
+    """Local entry point for testing."""
+    translator = Translator()
+    translator.load()
+
+    test_text = "hola, ¿cual es la capital de Mexico?"
+    print(f"Translating: {test_text}")
+
+    print("\n--- Streaming mode ---")
+    for token_id in translator.translate_streaming(test_text):
+        token = translator.decode([int(token_id)])
+        print(f"Token {token_id}: '{token}'")
+
+    print("\n--- Full mode ---")
+    result = translator.translate_full(test_text)
+    print(f"Input: {result['input']}")
+    print(f"Output: {result['output']}")
+    print(f"Token IDs: {result['token_ids']}")
