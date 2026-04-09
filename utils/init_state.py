@@ -2,13 +2,15 @@ import orbax.checkpoint as ocp
 from flax import nnx
 from transformer.Transformer import Transformer
 
-from utils.config import Config
-
 
 def init_state(
-    config: Config,
     src_vocab_size: int,
     target_vocab_size: int,
+    D_MODEL: int,
+    N: int,
+    H: int,
+    D_FF: int,
+    SEQ_LEN: int,
     manager: ocp.CheckpointManager,
 ) -> tuple[Transformer, nnx.Optimizer, int]:
     """
@@ -23,12 +25,12 @@ def init_state(
     # create abstract model
     abs_model = nnx.eval_shape(
         lambda: Transformer(
-            d_model=config.D_MODEL,
-            N=config.N,
-            n_heads=config.H,
-            d_ff=config.D_FF,
-            dropout=config.DROPOUT,
-            seq_len=config.SEQ_LEN,
+            d_model=D_MODEL,
+            N=N,
+            n_heads=H,
+            d_ff=D_FF,
+            dropout=None,
+            seq_len=SEQ_LEN,
             src_vocab_size=src_vocab_size,
             target_vocab_size=target_vocab_size,
             rngs=nnx.Rngs(0),
@@ -41,12 +43,12 @@ def init_state(
     # create model
     rngs = nnx.Rngs(0)
     model: Transformer = Transformer(
-        d_model=config.D_MODEL,
-        N=config.N,
-        n_heads=config.H,
-        d_ff=config.D_FF,
-        dropout=config.DROPOUT,
-        seq_len=config.SEQ_LEN,
+        d_model=D_MODEL,
+        N=N,
+        n_heads=H,
+        d_ff=D_FF,
+        dropout=None,
+        seq_len=SEQ_LEN,
         src_vocab_size=src_vocab_size,
         target_vocab_size=target_vocab_size,
         rngs=rngs,
