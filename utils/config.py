@@ -14,7 +14,7 @@ class Config(BaseSettings):
     EOS_ID: int = Field(default=2)
     BOS_ID: int = Field(default=1)
     D_MODEL: int = Field(default=512)
-    N: int = Field(defailt=6)
+    N: int = Field(default=6)
     H: int = Field(default=8)
     D_FF: int = Field(2048)
 

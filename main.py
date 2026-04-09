@@ -13,6 +13,7 @@ from typing import Generator
 import jax.numpy as jnp
 import modal
 import orbax.checkpoint as ocp
+from flax import nnx  # add to imports at top
 from sentencepiece import SentencePieceProcessor
 
 from utils.config import CONFIG
@@ -70,6 +71,7 @@ class Translator:
             SEQ_LEN=CONFIG.SEQ_LEN,
             manager=manager,
         )
+        self._infer_fn = nnx.jit(self.model, static_argnames=["is_training"])
 
     @modal.method()
     def stream_translation(
