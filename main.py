@@ -33,9 +33,6 @@ model_volume = modal.Volume.from_name(
 )
 
 
-utils = Utils()
-
-
 @app.cls(
     image=image,
     volumes={"/model": model_volume},
@@ -53,16 +50,23 @@ class Translator:
         self.sp.Load("/model/joint.model")
         self.eos_id = self.sp.eos_id()
         self.bos_id = self.sp.bos_id()
+        self.utils = Utils()
 
         # initialize the checkpoint manager with the options
-
         manager = ocp.CheckpointManager(
             directory=CONFIG.MODEL_CHECKPOINT_PATH.resolve(),
         )
-
         # Placeholder - replace with actual model loading
-        self.model = None  # Replace with loaded model
-        self._infer_fn = None  # Replace with JIT-compiled inference function
+        self.model = self.utils.init_state(
+            src_vocab_size=10,
+            target_vocab_size=10,
+            D_MODEL=10,
+            N=10,
+            H=10,
+            D_FF=10,
+            SEQ_LEN=10,
+            manager=manager,
+        )
 
     @modal.method()
     def stream_translation(

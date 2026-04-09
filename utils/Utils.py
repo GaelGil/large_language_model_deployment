@@ -1,5 +1,9 @@
 import jax.numpy as jnp
+import orbax.checkpoint as ocp
+from flax import nnx
 from jax import Array
+
+from transformer.Transformer import Transformer
 
 
 class Utils:
@@ -24,6 +28,8 @@ class Utils:
         self,
         text: str,
         tokenizer,
+        bos_id: int,
+        eos_id: int,
         max_len: int,
         add_bos: bool = False,
         add_eos: bool = False,
@@ -54,8 +60,70 @@ class Utils:
 
             # Add special tokens
             if add_bos:
-                ids = [self.bos_id] + ids
+                ids = [bos_id] + ids
             if add_eos:
-                ids = ids + [self.eos_id]
+                ids = ids + [eos_id]
 
         return ids
+
+    def init_state(
+        self,
+        src_vocab_size: int,
+        target_vocab_size: int,
+        D_MODEL: int,
+        N: int,
+        H: int,
+        D_FF: int,
+        SEQ_LEN: int,
+        manager: ocp.CheckpointManager,
+    ) -> Transformer:
+        """
+        Initialize the state from a checkpoint or create a new one
+        Args:
+            config: Config
+
+        Returns:
+        tuple[Transformer, nnx.Optimizer]
+        """
+
+        # create abstract model
+        abs_model = nnx.eval_shape(
+            lambda: Transformer(
+                d_model=D_MODEL,
+                N=N,
+                n_heads=H,
+                d_ff=D_FF,
+                dropout=0,
+                seq_len=SEQ_LEN,
+                src_vocab_size=src_vocab_size,
+                target_vocab_size=target_vocab_size,
+                rngs=nnx.Rngs(0),
+            )
+        )
+
+        # split the abstract model into graphdef, state and rng
+        abs_state = nnx.state(abs_model)
+
+        # create model
+        rngs = nnx.Rngs(0)
+        model: Transformer = Transformer(
+            d_model=D_MODEL,
+            N=N,
+            n_heads=H,
+            d_ff=D_FF,
+            dropout=0,
+            seq_len=SEQ_LEN,
+            src_vocab_size=src_vocab_size,
+            target_vocab_size=target_vocab_size,
+            rngs=rngs,
+        )
+
+        # restore the model
+        restored = manager.restore(
+            step=manager.latest_step(),
+            args=ocp.args.Composite(
+                state=ocp.args.StandardRestore(abs_state),
+            ),
+        )
+        nnx.update(model, restored["state"])
+        return model
