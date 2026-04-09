@@ -145,22 +145,3 @@ class Translator:
             # Append to decoder input for next iteration
             en_ids.append(next_token)
             en = jnp.array([en_ids], dtype=jnp.int32)
-
-
-# =============================================================================
-# Local development / testing
-# =============================================================================
-
-
-@app.local_entrypoint()
-def main():
-    """Local entry point for testing."""
-    translator = Translator()
-    translator.load()
-
-    encode = utils.encode()
-
-    print("\n--- Streaming mode ---")
-    for token_id in translator.translate_streaming(test_text):
-        token = translator.decode([int(token_id)])
-        print(f"Token {token_id}: '{token}'")
