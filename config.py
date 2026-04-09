@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings  # handles .env
 
 
-class Config(BaseModel):
-    SRC_CORPUS_PATH: str
-    TOKENIZER_PATH: str
-    SEQ_LEN: int
-    MODEL_PATH: str
-    MAX_LEN: int
+class Config(BaseSettings):
+    SRC_CORPUS_PATH: str = ""
+    TOKENIZER_PATH: str = "tokenizer/model/joint.model"  # path inside volume
+    SEQ_LEN: int = 256
+    MODEL_PATH: str = "tokenizer/model/joint.model"  # checkpoint path
+    MAX_LEN: int = 128
+    EOS_ID: int = 2  # sentencepiece eos id
 
-
-CONFIG = Config(
-    SRC_CORPUS_PATH="", TOKENIZER_PATH="", SEQ_LEN=1, MODEL_PATH="", MAX_LEN=1
-)
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
