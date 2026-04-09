@@ -60,14 +60,12 @@ class Translator:
             directory=CONFIG.MODEL_CHECKPOINT_PATH.resolve(),
         )
 
-        utils
-
         # Placeholder - replace with actual model loading
         self.model = None  # Replace with loaded model
         self._infer_fn = None  # Replace with JIT-compiled inference function
 
     @modal.method()
-    def translate_streaming(
+    def stream_translation(
         self,
         src_text: str,
         max_new_tokens: int = 128,
@@ -91,7 +89,7 @@ class Translator:
         # -------------------------------------------------------------------------
         # 1. Encode source text
         # -------------------------------------------------------------------------
-        es_ids = self.encode(src_text, add_bos=False, add_eos=False)
+        es_ids = self.utils.encode(src_text, add_bos=False, add_eos=False)
         es = jnp.array([es_ids], dtype=jnp.int32)  # [1, src_len]
 
         # -------------------------------------------------------------------------
@@ -143,16 +141,9 @@ def main():
     translator = Translator()
     translator.load()
 
-    test_text = "hola, ¿cual es la capital de Mexico?"
-    print(f"Translating: {test_text}")
+    encode = utils.encode()
 
     print("\n--- Streaming mode ---")
     for token_id in translator.translate_streaming(test_text):
         token = translator.decode([int(token_id)])
         print(f"Token {token_id}: '{token}'")
-
-    print("\n--- Full mode ---")
-    result = translator.translate_full(test_text)
-    print(f"Input: {result['input']}")
-    print(f"Output: {result['output']}")
-    print(f"Token IDs: {result['token_ids']}")
