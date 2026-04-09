@@ -83,7 +83,7 @@ class Utils:
             config: Config
 
         Returns:
-        tuple[Transformer, nnx.Optimizer]
+            Transformer
         """
 
         # create abstract model

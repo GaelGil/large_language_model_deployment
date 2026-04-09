@@ -16,7 +16,7 @@ class Config(BaseSettings):
     D_MODEL: int = Field(default=512)
     N: int = Field(default=6)
     H: int = Field(default=8)
-    D_FF: int = Field(2048)
+    D_FF: int = Field(default=2048)
 
     VOCAB_SIZE: int = Field(default=8000)
     NUM_LAYERS: int = Field(default=6)
