@@ -1,13 +1,3 @@
-"""
-Modal deployment for JAX NNX translation model.
-
-Usage:
-    modal deploy main.py
-
-Local testing:
-    modal run main --local
-"""
-
 from typing import Generator
 
 import jax.numpy as jnp
@@ -59,7 +49,7 @@ class Translator:
         )
 
         # -------------------------------------------------------------------------
-        # Restore the model
+        # restore the model
         # -------------------------------------------------------------------------
         self.model = self.utils.init_state(
             src_vocab_size=CONFIG.VOCAB_SIZE,

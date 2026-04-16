@@ -125,5 +125,12 @@ class Utils:
                 state=ocp.args.StandardRestore(abs_state),
             ),
         )
+        # import orbax.checkpoint as ocp
+
+        # # Initialize your manager
+        # checkpointer = ocp.Checkpointer(ocp.PyTreeCheckpointHandler())
+        # # Restore the PyTree (params)
+        # params = checkpointer.restore('path/to/model_checkpoint')
+
         nnx.update(model, restored["state"])
         return model
