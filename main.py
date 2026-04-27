@@ -3,7 +3,7 @@ from typing import Generator
 import jax.numpy as jnp
 import modal
 import orbax.checkpoint as ocp
-from flax import nnx  # add to imports at top
+from flax import nnx
 from sentencepiece import SentencePieceProcessor
 
 from utils.config import CONFIG
@@ -12,7 +12,7 @@ from utils.Utils import Utils
 app = modal.App("seq2seq-translator")
 
 image = modal.Image.debian_slim().uv_pip_install(
-    "jax[cuda12]",
+    "jax[cuda13]",
     "flax",
     "numpy",
     "sentencepiece",
