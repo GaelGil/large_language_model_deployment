@@ -1130,7 +1130,7 @@ wheels = [
 ]
 
 [[package]]
-name = "psychic-bassoon"
+name = "large_language_model_deployment"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
