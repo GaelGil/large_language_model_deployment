@@ -10,11 +10,7 @@ class MultiHeadAttentionBlock(nnx.Module):
     In multi head attention we split the original input sequence
     (seq_len, d_model) into (n_heads, seq_len, d_k).
 
-<<<<<<< HEAD
-    Each head has its own fragments of query, key and value
-=======
     Each head has a small part of query, key and value
->>>>>>> 91619b06fb7749c0bbd68a49b8340a41d0707956
 
     This way each head can focus on learning different representations
     of the sequence rather than learning the same representation for
@@ -31,10 +27,7 @@ class MultiHeadAttentionBlock(nnx.Module):
             d_model: dimension of the model
             n_heads: number of heads
             dropout_rate: dropout probability
-<<<<<<< HEAD
-=======
             rngs: rngs
->>>>>>> 91619b06fb7749c0bbd68a49b8340a41d0707956
 
         Returns:
             None
@@ -56,10 +49,10 @@ class MultiHeadAttentionBlock(nnx.Module):
         query: Array,  # (batch_size, n_heads, seq_len, d_k)
         key: Array,  # (batch_size, n_heads, seq_len, d_k)
         value: Array,  # (batch_size, n_heads, seq_len, d_k)
-        mask: Array,
+        mask: Array | None,
         dropout: nnx.Dropout,
         is_training: bool,
-        rngs: nnx.Rngs,
+        rngs: nnx.Rngs | None,
     ) -> Array:
         d_k = query.shape[-1]  # get dimension of last axis
         # (Q * K^T)/sqrt(d_k)
@@ -93,10 +86,12 @@ class MultiHeadAttentionBlock(nnx.Module):
         q: Array,
         k: Array,
         v: Array,
-        mask: Array,
+        mask: Array | None,
         is_training: bool,
-        rngs: nnx.Rngs,
-    ):
+        rngs: nnx.Rngs | None,
+        past_kv: tuple | None = None,
+        use_cache: bool = False,
+    ) -> tuple[Array, tuple | None]:
         """
 
         Args:
@@ -106,15 +101,12 @@ class MultiHeadAttentionBlock(nnx.Module):
             mask: mask
             is_training: is training
             rngs: rngs
+            past_kv: tuple | None = None
+            use_cache: bool = None
 
         Returns:
-            Array
+            tuple[Array , tuple | None]
         """
-<<<<<<< HEAD
-        query = self.w_q(q)  # (batch_size, seq_len, d_model)
-        key = self.w_k(k)  # (batch_size, seq_len, d_model)
-        value = self.w_v(v)  # (batch_size, seq_len, d_model)
-=======
         query = self.w_q(
             q
         )  # (batch_size, seq_len, d_model) --> (batch_size, d_model, d_model)
@@ -124,7 +116,6 @@ class MultiHeadAttentionBlock(nnx.Module):
         value = self.w_v(
             v
         )  # (batch_size, seq_len, d_model)  --> (batch_size, d_model, d_model)
->>>>>>> 91619b06fb7749c0bbd68a49b8340a41d0707956
 
         # these will be the same in the encoder
         batch_size_q, seq_len_q, _ = query.shape  # decoder query
@@ -143,6 +134,14 @@ class MultiHeadAttentionBlock(nnx.Module):
             batch_size_k, seq_len_k, self.n_heads, self.d_k
         ).transpose(0, 2, 1, 3)
 
+        # concat with past K,V if provided
+        if past_kv is not None:
+            past_k, past_v = past_kv
+            key = jnp.concatenate([past_k, key], axis=2)
+            value = jnp.concatenate([past_v, value], axis=2)
+
+        present_k, present_v = key, value
+
         # scaled dot product
         # (batch_size, n_heads, seq_len, d_k) -> (batch_size, n_heads, seq_len, d_k)
         x = self.scaled_dot_product_attention(
@@ -154,4 +153,4 @@ class MultiHeadAttentionBlock(nnx.Module):
 
         # final linear
         x = self.w_o(x)  # (batch_size, seq_len, d_model)
-        return x
+        return x, (present_k, present_v) if use_cache else None

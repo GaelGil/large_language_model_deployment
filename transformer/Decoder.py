@@ -48,7 +48,9 @@ class DecoderBlock(nnx.Module):
         cross_mask: Array,
         is_training: bool,
         rngs: nnx.Rngs,
-    ) -> Array:
+        self_attention_cache: tuple | None = None,
+        use_cache: bool= False
+    ) -> tuple[Array , tuple | None]
         """
         Args:
             x: input
@@ -64,15 +66,19 @@ class DecoderBlock(nnx.Module):
 
         x_norm = self.norm1(x)
 
+        attention_output, self_attention_cache_output = self.masked_multi_head_attention_block(
+                       q=x_norm,
+                       k=x_norm,
+                       v=x_norm,
+                       mask=self_mask,
+                       is_training=is_training,
+                       rngs=rngs,
+                       past_kv=self_attention_cache,
+                       use_cache=use_cache
+                   )
+
         x = x + self.dropout(
-            self.masked_multi_head_attention_block(
-                q=x_norm,
-                k=x_norm,
-                v=x_norm,
-                mask=self_mask,
-                is_training=is_training,
-                rngs=rngs,
-            ),
+            attention_output,
             deterministic=not is_training,
             rngs=rngs,
         )
@@ -100,7 +106,7 @@ class DecoderBlock(nnx.Module):
             rngs=rngs,
         )
 
-        return x
+        return x, self_attention_cache_output if use_cache is not None
 
 
 class Decoder(nnx.Module):
@@ -127,7 +133,9 @@ class Decoder(nnx.Module):
         cross_mask: Array,
         is_training: bool,
         rngs: nnx.Rngs,
-    ) -> Array:
+        self_attention_cache: list[tuple] | None = None,
+        use_cache: bool = False
+    ) -> tuple[Array, tuple | None]:
         """
         Args:
             x: input
@@ -137,10 +145,11 @@ class Decoder(nnx.Module):
             is_training: is training
 
         Returns:
-            Array
+            tuple[Array, tuple | None]
         """
+        caches = []
         for block in self.blocks:
-            x = block(
+            x, cache_output = block(
                 x=x,
                 encoder_output=encoder_output,
                 self_mask=self_mask,
@@ -148,4 +157,6 @@ class Decoder(nnx.Module):
                 is_training=is_training,
                 rngs=rngs,
             )
-        return self.norm(x)
+            if use_cache:
+                caches.append(cache_output)
+        return self.norm(x),
