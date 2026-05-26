@@ -126,7 +126,7 @@ class Translator:
         )
 
         encoder_output = cache["encoder_output"]
-        self_attenntion_cache = cache["self_attention_cache"]
+        self_attention_cache = cache["self_attention_cache"]
 
         next_token = int(jnp.argmax(logits[0, -1]))
 
