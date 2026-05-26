@@ -61,7 +61,9 @@ class Translator:
             SEQ_LEN=CONFIG.SEQ_LEN,
             manager=manager,
         )
-        self._infer_fn = nnx.jit(self.model, static_argnames=["is_training"])
+        self._infer_fn = nnx.jit(
+            self.model, static_argnames=["is_training", "use_cache"]
+        )
 
     @modal.method()
     def stream_translation(
@@ -106,6 +108,38 @@ class Translator:
         en_ids = [self.sp.bos_id()]
         en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
 
+        # Empty KV cache
+        self_attention_cache = [None] * CONFIG.N
+
+        decoder_mask = self.utils._create_causal_mask(en.shape[1])
+
+        # Forward pass
+        logits, cache = self._infer_fn(
+            src=es,
+            target=en,
+            src_mask=None,
+            self_mask=decoder_mask,
+            cross_mask=None,
+            is_training=False,
+            self_attention_cache=self_attention_cache,
+            use_cache=True,
+        )
+
+        encoder_output = cache["encoder_output"]
+        self_attenntion_cache = cache["self_attention_cache"]
+
+        next_token = int(jnp.argmax(logits[0, -1]))
+
+        # Check for EOS
+        if next_token == self.sp.eos_id():
+            return
+
+        # Yield token ID for streaming
+        yield str(next_token)
+
+        # Append to decoder input for next iteration
+        en_ids.append(next_token)
+
         # -------------------------------------------------------------------------
         # 3. Autoregressive generation loop
         # -------------------------------------------------------------------------
@@ -114,15 +148,19 @@ class Translator:
             decoder_mask = self.utils._create_causal_mask(en.shape[1])
 
             # Forward pass
-            logits = self._infer_fn(
+            logits, cache = self._infer_fn(
                 src=es,
                 target=en,
                 src_mask=None,
                 self_mask=decoder_mask,
                 cross_mask=None,
                 is_training=False,
+                self_attention_cache=self_attention_cache,
+                encoder_output=encoder_output,
+                use_cache=True,
             )
 
+            self_attention_cache = cache["self_attention_cache"]
             # Greedy sampling: take argmax of last token logits
             next_token = int(jnp.argmax(logits[0, -1]))
 

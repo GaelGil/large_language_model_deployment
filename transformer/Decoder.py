@@ -1,3 +1,4 @@
+import turtle
 from flax import nnx
 from jax import Array
 
@@ -47,7 +48,7 @@ class DecoderBlock(nnx.Module):
         self_mask: Array,
         cross_mask: Array,
         is_training: bool,
-        rngs: nnx.Rngs,
+        rngs: nnx.Rngs | None,
         self_attention_cache: tuple | None = None,
         use_cache: bool= False
     ) -> tuple[Array , tuple | None]
@@ -132,10 +133,10 @@ class Decoder(nnx.Module):
         self_mask: Array,
         cross_mask: Array,
         is_training: bool,
-        rngs: nnx.Rngs,
+        rngs: nnx.Rngs | None,
         self_attention_cache: list[tuple] | None = None,
         use_cache: bool = False
-    ) -> tuple[Array, tuple | None]:
+    ) -> tuple[Array, list[tuple] | None]:
         """
         Args:
             x: input
@@ -156,7 +157,9 @@ class Decoder(nnx.Module):
                 cross_mask=cross_mask,
                 is_training=is_training,
                 rngs=rngs,
+                self_attention_cache=self_attention_cache,
+                use_cache=use_cache
             )
             if use_cache:
                 caches.append(cache_output)
-        return self.norm(x),
+        return self.norm(x), caches if use_cache else None
