@@ -48,7 +48,7 @@ class Translator:
         # initialize the checkpoint manager
         # -------------------------------------------------------------------------
         manager = ocp.CheckpointManager(
-            directory=CONFIG.MODEL_CHECKPOINT_PATH.resolve(),
+            directory=CONFIG.MODEL_CHECKPOINT_DIR.resolve(),
         )
 
         # -------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class Translator:
         """
         if self.model is None:
             raise RuntimeError(
-                "Model not loaded. Please set MODEL_CHECKPOINT_PATH and implement "
+                "Model not loaded. Please set MODEL_CHECKPOINT_DIR and implement "
                 "checkpoint loading in the load() method."
             )
 
