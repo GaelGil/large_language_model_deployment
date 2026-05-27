@@ -16,6 +16,9 @@ image = modal.Image.debian_slim().uv_pip_install(
     "flax",
     "numpy",
     "sentencepiece",
+    "orbax-checkpoint",
+    "pydantic",
+    "pydantic-settings",
 )
 
 model_volume = modal.Volume.from_name(
@@ -174,3 +177,7 @@ class Translator:
             # Append to decoder input for next iteration
             en_ids.append(next_token)
             en = jnp.array([en_ids], dtype=jnp.int32)
+
+
+# we present humanlike ai for attending meetings, sales calls.
+# Send your own personal AI avatar to atteend meetings, take notes, ask questions.
