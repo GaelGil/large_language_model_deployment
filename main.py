@@ -9,27 +9,37 @@ from sentencepiece import SentencePieceProcessor
 from utils.config import CONFIG
 from utils.Utils import Utils
 
+# define the app name
 app = modal.App("seq2seq-translator")
 
-image = modal.Image.debian_slim().uv_pip_install(
-    "jax[cuda13]",
-    "flax",
-    "numpy",
-    "sentencepiece",
-    "orbax-checkpoint",
-    "pydantic",
-    "pydantic-settings",
+# define the container image
+image = (
+    modal.Image.debian_slim()
+    .uv_pip_install(
+        "jax[cuda13]",
+        "flax",
+        "numpy",
+        "sentencepiece",
+        "orbax-checkpoint",
+        "pydantic",
+        "pydantic-settings",
+    )
+    .add_local_file(
+        "tokenizer/model/joint.model",
+        remote_path=str(CONFIG.TOKENIZER_PATH),
+    )
 )
 
-model_volume = modal.Volume.from_name(
-    CONFIG.MODAL_VOLUME_NAME,
-    create_if_missing=True,
-)
+# load the persistent Modal volume that stores model checkpoints.
+checkpoint_volume = modal.Volume.from_name(CONFIG.MODAL_VOLUME_NAME)
 
 
+# create a class
 @app.cls(
     image=image,
-    volumes={"/model": model_volume},
+    volumes={
+        "/model": checkpoint_volume
+    },  # attach the checkpoint volume and show as /model
     gpu=CONFIG.MODAL_GPU,
     memory=CONFIG.MODAL_MEMORY,
 )
@@ -38,10 +48,10 @@ class Translator:
     def load(self):
         """Load tokenizer and model on container startup."""
         # -------------------------------------------------------------------------
-        #  Load SentencePiece tokenizer
+        #  load SentencePiece tokenizer
         # -------------------------------------------------------------------------
         self.sp = SentencePieceProcessor()
-        self.sp.Load(CONFIG.TOKENIZER_PATH)
+        self.sp.Load(str(CONFIG.TOKENIZER_PATH))
         self.utils = Utils()
 
         # -------------------------------------------------------------------------
@@ -100,7 +110,7 @@ class Translator:
             raise RuntimeError("Tokenizer does not define an BOS token")
 
         # -------------------------------------------------------------------------
-        # 1. Encode source text
+        # encode source text
         # -------------------------------------------------------------------------
         es_ids = self.utils.encode(
             src_text,
@@ -114,7 +124,7 @@ class Translator:
         es = jnp.array([es_ids], dtype=jnp.int32)  # [1, src_len]
 
         # -------------------------------------------------------------------------
-        # 2. Initialize decoder with BOS
+        # initialize decoder with BOS
         # -------------------------------------------------------------------------
         en_ids = [bos_id]
         en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
@@ -152,7 +162,7 @@ class Translator:
         en_ids.append(next_token)
 
         # -------------------------------------------------------------------------
-        # 3. Autoregressive generation loop
+        # autoregressive generation loop
         # -------------------------------------------------------------------------
         for _ in range(max_new_tokens):
             # Create causal mask for current sequence length
@@ -185,7 +195,3 @@ class Translator:
             # Append to decoder input for next iteration
             en_ids.append(next_token)
             en = jnp.array([en_ids], dtype=jnp.int32)
-
-
-# we present humanlike ai for attending meetings, sales calls.
-# Send your own personal AI avatar to atteend meetings, take notes, ask questions.
