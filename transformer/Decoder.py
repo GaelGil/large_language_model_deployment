@@ -163,5 +163,6 @@ class Decoder(nnx.Module):
                 use_cache=use_cache,
             )
             if use_cache:
+                assert caches
                 caches.append(cache_output)
         return self.norm(x), caches if use_cache else None
