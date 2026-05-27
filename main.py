@@ -90,7 +90,15 @@ class Translator:
                 "checkpoint loading in the load() method."
             )
 
-        assert self.sp.eos_id
+        eos_id = self.sp.eos_id()
+        bos_id = self.sp.bos_id()
+
+        if eos_id < 0:
+            raise RuntimeError("Tokenizer does not define an EOS token")
+
+        if bos_id < 0:
+            raise RuntimeError("Tokenizer does not define an BOS token")
+
         # -------------------------------------------------------------------------
         # 1. Encode source text
         # -------------------------------------------------------------------------
@@ -98,8 +106,8 @@ class Translator:
             src_text,
             add_bos=False,
             add_eos=False,
-            eos_id=self.sp.eos_id(),
-            bos_id=self.sp.bos_id(),
+            eos_id=eos_id,
+            bos_id=bos_id,
             tokenizer=self.sp,
             max_len=CONFIG.MAX_LEN,
         )
@@ -108,7 +116,7 @@ class Translator:
         # -------------------------------------------------------------------------
         # 2. Initialize decoder with BOS
         # -------------------------------------------------------------------------
-        en_ids = [self.sp.bos_id()]
+        en_ids = [bos_id]
         en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
 
         # Empty KV cache
@@ -134,7 +142,7 @@ class Translator:
         next_token = int(jnp.argmax(logits[0, -1]))
 
         # Check for EOS
-        if next_token == self.sp.eos_id():
+        if next_token == eos_id:
             return
 
         # Yield token ID for streaming
@@ -168,7 +176,7 @@ class Translator:
             next_token = int(jnp.argmax(logits[0, -1]))
 
             # Check for EOS
-            if next_token == self.sp.eos_id():
+            if next_token == eos_id:
                 break
 
             # Yield token ID for streaming
