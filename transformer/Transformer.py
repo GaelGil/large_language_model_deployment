@@ -93,10 +93,10 @@ class Transformer(nnx.Module):
     def __call__(
         self,
         src: Array,
-        src_mask: Array,
+        src_mask: Array | None,
         target: Array,
         self_mask: Array,
-        cross_mask: Array,
+        cross_mask: Array | None,
         is_training: bool,
         rngs: nnx.Rngs | None = None,
         encoder_output: Array | None = None,
@@ -133,6 +133,8 @@ class Transformer(nnx.Module):
             self_mask=self_mask,
             cross_mask=cross_mask,
             is_training=is_training,
+            self_attention_cache=self_attention_cache,
+            use_cache=use_cache,
             rngs=rngs,
         )
 
