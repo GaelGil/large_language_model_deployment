@@ -8,7 +8,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8")
 
     TOKENIZER_PATH: str = Field(default="/tokenizer/model/joint.model")
-    MODEL_CHECKPOINT_ROOT: Path = Field(default=Path("/models"))
+    MODEL_CHECKPOINT_DIR: Path = Field(default=Path("/models"))
     MODEL_CHECKPOINTS: dict[str, str] = {
         "english": "english",
         "spanish": "spanish",
