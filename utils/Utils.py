@@ -2,8 +2,32 @@ import jax.numpy as jnp
 import orbax.checkpoint as ocp
 from flax import nnx
 from jax import Array
-
+from pydantic import BaseModel, Field
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from transformer.Transformer import Transformer
+from utils.config import CONFIG
+
+  def require_auth(
+      credentials: HTTPAuthorizationCredentials | None = Depends(auth_scheme),
+  ) -> None:
+      expected_token = os.environ.get("AUTH_TOKEN")
+      if expected_token is None:
+          raise RuntimeError("AUTH_TOKEN must be set via Modal Secret translator-auth-token")
+
+      if credentials is None or not hmac.compare_digest(
+          credentials.credentials,
+          expected_token,
+      ):
+          raise HTTPException(
+              status_code=status.HTTP_401_UNAUTHORIZED,
+              detail="Invalid bearer token",
+              headers={"WWW-Authenticate": "Bearer"},
+          )
+
+
+class TranslationRequest(BaseModel):
+    text: str = Field(min_length=1)
+    max_new_tokens: int = Field(default=128, ge=1, le=CONFIG.MAX_LEN)
 
 
 class Utils:

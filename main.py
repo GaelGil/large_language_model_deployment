@@ -1,13 +1,16 @@
+import json
 from typing import Generator
 
 import jax.numpy as jnp
 import modal
 import orbax.checkpoint as ocp
+from fastapi import Depends
+from fastapi.responses import StreamingResponse
 from flax import nnx
 from sentencepiece import SentencePieceProcessor
 
 from utils.config import CONFIG
-from utils.Utils import Utils
+from utils.Utils import TranslationRequest, Utils
 
 # define the app name
 app = modal.App("seq2seq-translator")
@@ -78,12 +81,11 @@ class Translator:
             self.model, static_argnames=["is_training", "use_cache"]
         )
 
-    @modal.method()
-    def stream_translation(
+    def stream_token_ids(
         self,
         src_text: str,
         max_new_tokens: int = 128,
-    ) -> Generator[str, None, None]:
+    ) -> Generator[int, None, None]:
         """
         Translate text with token-by-token streaming.
 
@@ -156,7 +158,7 @@ class Translator:
             return
 
         # Yield token ID for streaming
-        yield str(next_token)
+        yield next_token
 
         # Append to decoder input for next iteration
         en_ids.append(next_token)
@@ -190,8 +192,21 @@ class Translator:
                 break
 
             # Yield token ID for streaming
-            yield str(next_token)
+            yield next_token
 
             # Append to decoder input for next iteration
             en_ids.append(next_token)
             en = jnp.array([en_ids], dtype=jnp.int32)
+
+        @modal.fastapi_endpoint(method="POST")
+        def translate(
+            self, request: TranslationRequest, _: None = Depends(require_auth)
+        ) -> StreamingResponse:
+            generate_ids: list[int] = []
+            text = ""
+            for token_id in self.stream_token_ids(request.text, request.max_new_tokens):
+                generate_ids.append(int(token_id))
+                decoded_text = self.sp.Decode(generate_ids)
+                delta = decoded_text[len(text)]
+                if delta:
+                    yield f"data: {json.dumps()}"
