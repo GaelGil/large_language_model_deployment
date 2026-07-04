@@ -10,7 +10,7 @@ from flax import nnx
 from sentencepiece import SentencePieceProcessor
 
 from utils.config import CONFIG
-from utils.Utils import TranslationRequest, Utils
+from utils.Utils import TranslationRequest, Utils, require_auth
 
 # define the app name
 app = modal.App("seq2seq-translator")
@@ -26,14 +26,16 @@ image = (
         "orbax-checkpoint",
         "pydantic",
         "pydantic-settings",
+        "fastapi[standard]",
     )
+    .add_local_python_source("transformer", "utils")
     .add_local_file(
         "tokenizer/model/joint.model",
         remote_path=str(CONFIG.TOKENIZER_PATH),
     )
 )
 
-# load the persistent Modal volume that stores model checkpoints.
+# load the persistent Modal volume (storage) that stores model checkpoints.
 checkpoint_volume = modal.Volume.from_name(CONFIG.MODAL_VOLUME_NAME)
 
 
@@ -45,6 +47,7 @@ checkpoint_volume = modal.Volume.from_name(CONFIG.MODAL_VOLUME_NAME)
     },  # attach the checkpoint volume and show as /model
     gpu=CONFIG.MODAL_GPU,
     memory=CONFIG.MODAL_MEMORY,
+    secrets=[modal.Secret.from_name("translator-auth-token")],
 )
 class Translator:
     @modal.enter()
@@ -166,7 +169,7 @@ class Translator:
         # -------------------------------------------------------------------------
         # autoregressive generation loop
         # -------------------------------------------------------------------------
-        for _ in range(max_new_tokens):
+        for _ in range(max_new_tokens - 1):
             # Create causal mask for current sequence length
             decoder_mask = self.utils._create_causal_mask(en.shape[1])
 
@@ -198,15 +201,25 @@ class Translator:
             en_ids.append(next_token)
             en = jnp.array([en_ids], dtype=jnp.int32)
 
-        @modal.fastapi_endpoint(method="POST")
-        def translate(
-            self, request: TranslationRequest, _: None = Depends(require_auth)
-        ) -> StreamingResponse:
-            generate_ids: list[int] = []
-            text = ""
+    @modal.fastapi_endpoint(method="POST")
+    def translate(
+        self, request: TranslationRequest, _: None = Depends(require_auth)
+    ) -> StreamingResponse:
+        def event_stream() -> Generator[bytes, None, None]:
+            generated_ids: list[int] = []
+            output_text = ""
+            # for every token id
             for token_id in self.stream_token_ids(request.text, request.max_new_tokens):
-                generate_ids.append(int(token_id))
-                decoded_text = self.sp.Decode(generate_ids)
-                delta = decoded_text[len(text)]
+                # add it to generated ids
+                generated_ids.append(int(token_id))
+                # decode the ids
+                decoded_text = self.sp.Decode(generated_ids)
+                # return the most recent one
+                delta = decoded_text[len(output_text) :]
+                # stream it
                 if delta:
-                    yield f"data: {json.dumps()}"
+                    yield f"data: {json.dumps({'text': delta})}\n\n".encode()
+                    output_text = decoded_text
+            yield b"event: done\ndata: {}\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
