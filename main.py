@@ -182,7 +182,7 @@ class Translator:
             )
 
             self_attention_cache = cache["self_attention_cache"]
-            # Greedy sampling: take argmax of last token logits
+            # Take argmax of last token logits
             next_token = int(jnp.argmax(logits[0, -1]))
 
             # Check for EOS
