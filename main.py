@@ -135,9 +135,12 @@ class Translator:
         en = jnp.array([en_ids], dtype=jnp.int32)  # [1, tgt_len]
 
         # Empty KV cache
-        self_attention_cache = [None] * CONFIG.N
+        self_attention_cache = None
 
-        decoder_mask = self.utils._create_causal_mask(en.shape[1])
+        past_len = 0
+        decoder_mask = self.utils._create_causal_mask(
+            current_len=en.shape[1], past_len=past_len
+        )
 
         # Forward pass
         logits, cache = self._infer_fn(
@@ -171,8 +174,14 @@ class Translator:
         # -------------------------------------------------------------------------
         for _ in range(max_new_tokens - 1):
             # Create causal mask for current sequence length
-            decoder_mask = self.utils._create_causal_mask(en.shape[1])
-
+            past_len = (
+                self_attention_cache[0][0].shape[2]
+                if self_attention_cache is not None
+                else 0
+            )
+            decoder_mask = self.utils._create_causal_mask(
+                current_len=en.shape[1], past_len=past_len
+            )
             # Forward pass
             logits, cache = self._infer_fn(
                 src=es,

@@ -48,15 +48,19 @@ class Utils:
         """Decode token IDs to text using SentencePiece."""
         return tokenizer.Decode(ids)
 
-    def _create_causal_mask(self, seq_len: int) -> Array:
+    def _create_causal_mask(self, current_len: int, past_len: int = 0) -> Array:
         """
         Create causal (triangular) attention mask.
 
         This ensures each token can only attend to previous tokens,
         which is required for autoregressive generation.
         """
-        mask = jnp.tril(jnp.ones((seq_len, seq_len), dtype=jnp.bool_))[None, None, :, :]
-        return mask
+        query_positions = (past_len + jnp.arange(current_len))[:, None]
+
+        key_positions = jnp.arange(past_len + current_len)[None, :]
+
+        mask = key_positions <= query_positions
+        return mask[None, None, :, :]
 
     def encode(
         self,
