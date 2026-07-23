@@ -167,7 +167,7 @@ class Translator:
         yield next_token
 
         # Append to decoder input for next iteration
-        en_ids.append(next_token)
+        en = jnp.array([[next_token]], dtype=jnp.int32)
 
         # -------------------------------------------------------------------------
         # autoregressive generation loop
@@ -207,8 +207,7 @@ class Translator:
             yield next_token
 
             # Append to decoder input for next iteration
-            en_ids.append(next_token)
-            en = jnp.array([en_ids], dtype=jnp.int32)
+            en = jnp.array([[next_token]], dtype=jnp.int32)
 
     @modal.fastapi_endpoint(method="POST")
     def translate(
