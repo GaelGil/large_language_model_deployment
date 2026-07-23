@@ -61,6 +61,7 @@ class EncoderBlock(nnx.Module):
         """
 
         x_norm = self.norm1(x)
+
         x = x + self.dropout(
             self.multi_head_attention_block(
                 q=x_norm,
