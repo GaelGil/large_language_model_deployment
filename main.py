@@ -1,5 +1,5 @@
 import json
-from typing import Generator
+from collections.abc import Generator
 
 import jax.numpy as jnp
 import modal
@@ -39,12 +39,12 @@ image = (
 checkpoint_volume = modal.Volume.from_name(CONFIG.MODAL_VOLUME_NAME)
 
 
-# create a class
+# Register a class
 @app.cls(
-    image=image,
+    image=image,  # create Translator containers using this image
     volumes={
         "/model": checkpoint_volume
-    },  # attach the checkpoint volume and show as /model
+    },  # attach the checkpoint volume (storage) and show as /model
     gpu=CONFIG.MODAL_GPU,
     memory=CONFIG.MODAL_MEMORY,
     secrets=[modal.Secret.from_name("translator-auth-token")],
@@ -52,7 +52,11 @@ checkpoint_volume = modal.Volume.from_name(CONFIG.MODAL_VOLUME_NAME)
 class Translator:
     @modal.enter()
     def load(self):
-        """Load tokenizer and model on container startup."""
+        """Load tokenizer and model on container startup.
+
+        Whenever a new Translator container starts we run load.
+
+        """
         # -------------------------------------------------------------------------
         #  load SentencePiece tokenizer
         # -------------------------------------------------------------------------
@@ -88,7 +92,7 @@ class Translator:
         self,
         src_text: str,
         max_new_tokens: int = 128,
-    ) -> Generator[int, None, None]:
+    ) -> Generator[int]:
         """
         Translate text with token-by-token streaming.
 
@@ -213,7 +217,7 @@ class Translator:
     def translate(
         self, request: TranslationRequest, _: None = Depends(require_auth)
     ) -> StreamingResponse:
-        def event_stream() -> Generator[bytes, None, None]:
+        def event_stream() -> Generator[bytes]:
             generated_ids: list[int] = []
             output_text = ""
             # for every token id
