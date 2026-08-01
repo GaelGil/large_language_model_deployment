@@ -87,15 +87,17 @@ class DecoderBlock(nnx.Module):
 
         x_norm = self.norm2(x)
 
+        cross_attention_output, _ = self.cross_attention_block(
+            q=x_norm,
+            k=encoder_output,
+            v=encoder_output,
+            mask=cross_mask,
+            is_training=is_training,
+            rngs=rngs,
+        )
+
         x = x + self.dropout(
-            self.cross_attention_block(
-                q=x_norm,
-                k=encoder_output,
-                v=encoder_output,
-                mask=cross_mask,
-                is_training=is_training,
-                rngs=rngs,
-            ),
+            cross_attention_output,
             deterministic=not is_training,
             rngs=rngs,
         )
