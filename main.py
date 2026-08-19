@@ -128,7 +128,7 @@ class Translator:
             eos_id=eos_id,
             bos_id=bos_id,
             tokenizer=self.sp,
-            max_len=CONFIG.MAX_LEN,
+            max_len=CONFIG.SEQ_LEN,
         )
         es = jnp.array([es_ids], dtype=jnp.int32)  # [1, src_len]
 
